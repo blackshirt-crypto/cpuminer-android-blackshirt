@@ -20,7 +20,7 @@ yes | pkg update && pkg upgrade -y
 # Step 2: Install dependencies
 echo ""
 echo "[2/5] Installing dependencies..."
-yes | pkg install git build-essential automake autoconf libcurl libjansson openssl pkg-config libtool -y
+yes | pkg install git clang build-essential automake autoconf libcurl libjansson openssl pkg-config libtool make -y
 
 # Step 3: Clone cpuminer-blackshirt
 echo ""
