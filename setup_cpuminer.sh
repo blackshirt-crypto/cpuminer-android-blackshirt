@@ -20,7 +20,7 @@ yes | pkg update && pkg upgrade -y
 # Step 2: Install dependencies
 echo ""
 echo "[2/5] Installing dependencies..."
-yes | pkg install git clang build-essential automake autoconf libcurl libjansson openssl pkg-config libtool make -y
+yes | pkg install git clang build-essential automake autoconf libcurl libjansson openssl pkg-config libtool make gmp -y
 
 # Step 3: Clone cpuminer-blackshirt
 echo ""
@@ -41,10 +41,8 @@ echo "This may take 15-30 minutes, please be patient..."
 echo ""
 
 ./autogen.sh
-./configure CFLAGS="-O3 -march=armv8-a" \
-            CXXFLAGS="-O3 -march=armv8-a" \
-            --with-curl \
-            --disable-assembly
+./configure CFLAGS="-O2 -march=armv8-a+crypto+sha2+aes -flax-vector-conversions" \
+            --with-curl
 make
 
 # Check if build was successful
