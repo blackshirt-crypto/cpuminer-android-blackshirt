@@ -41,8 +41,8 @@ echo "This may take 15-30 minutes, please be patient..."
 echo ""
 
 ./autogen.sh
-./configure CFLAGS="-O3 -march=armv8-a -mfpu=neon" \
-            CXXFLAGS="-O3 -march=armv8-a -mfpu=neon" \
+./configure CFLAGS="-O3 -march=armv8-a" \
+            CXXFLAGS="-O3 -march=armv8-a" \
             --with-curl \
             --disable-assembly
 make
