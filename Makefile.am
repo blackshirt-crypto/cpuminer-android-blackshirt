@@ -67,6 +67,7 @@ cpuminer_SOURCES = \
   algo/whirlpool/sph_whirlpool.c \
   algo/whirlpool/whirlpool-gate.c \
   algo/whirlpool/whirlpool.c \
+  algo/civiclight/civiclight-gate.c \
   algo/whirlpool/whirlpoolx.c \
   algo/blake/sph_blake2b.c \
   algo/yespower/yespower-gate.c \
