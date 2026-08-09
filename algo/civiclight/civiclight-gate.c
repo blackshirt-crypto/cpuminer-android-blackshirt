@@ -52,9 +52,7 @@ int scanhash_civiclight( struct work *work, uint32_t max_nonce,
     uint32_t n = first_nonce;
     const int thr_id = mythr->id;
 
-    for ( int k = 0; k < 19; k++ )
-        be32enc( &endiandata[k], pdata[k] );
-    endiandata[19] = n;
+    memcpy( endiandata, pdata, 80 );
 
     do {
         if ( civiclight_hash( (char*)endiandata, (char*)vhash, thr_id ) )
@@ -82,7 +80,7 @@ bool register_civiclight_algo( algo_gate_t* gate )
     gate->optimizations = SSE2_OPT | SHA256_OPT | NEON_OPT;
     gate->scanhash      = (void*)&scanhash_civiclight;
     gate->hash          = (void*)&civiclight_hash;
-    opt_target_factor   = 65536.0;
+    opt_target_factor   = 1.0;
 
     applog( LOG_NOTICE, "Civiclight: SHA256 -> yespower(N=2048,r=8) -> XOR -> SHA256" );
     return true;
