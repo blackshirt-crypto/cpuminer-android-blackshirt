@@ -95,6 +95,7 @@ bool register_civiclight_algo( algo_gate_t* gate )
     gate->optimizations = SSE2_OPT | AVX2_OPT | AVX512_OPT | NEON_OPT;
     gate->scanhash      = (void*)&scanhash_civiclight;
     gate->hash          = (void*)&civiclight_hash;
+    opt_target_factor   = 65536.0;
 
     applog( LOG_NOTICE, "Civiclight: SHA256d -> SHA256 -> yespower(N=2048,r=8) -> XOR -> SHA256" );
     return true;
