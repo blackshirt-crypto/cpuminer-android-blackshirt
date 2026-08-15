@@ -1,102 +1,102 @@
 /*
  * civiclight-gate.c — CivicNet (CIVIC) mining algorithm for cpuminer-opt
  *
- * civiclight v2 PoW hash pipeline (confirmed by NitroPool):
- *   1. SHA256d( block_header_80_bytes ) → intermediate  (32 bytes)
- *   2. SHA256( intermediate ) → hash1  (32 bytes)
- *   3. yespower_1.0( hash1, N=2048, r=8 ) → yp_out  (32 bytes)
- *   4. XOR( yp_out, hash1 ) → xor_buf  (32 bytes)
- *   5. SHA256( xor_buf ) → final_hash  (32 bytes)
+ * Pipeline: SHA256d(header) -> SHA256 -> civic_yespower(N=2048,r=8) -> XOR -> SHA256
+ * Uses namespaced civic_yespower (from NitroPool/CivicNet daemon source)
+ * to guarantee hash compatibility with the chain.
  *
  * Blackshirt Crypto — blkshirtpool.com
  */
 
 #include "algo-gate-api.h"
 #include "algo/sha/sha256-hash.h"
-#include "algo/yespower/yespower.h"
+#include "algo/civiclight/yespower/yespower.h"
 
-static yespower_params_t civiclight_yp_params;
-
-static void civiclight_powhash( void *output, const void *header80, int thrid )
+static void sha256d_local( void *output, const void *input, size_t len )
 {
-    uint8_t intermediate[32];
-    uint8_t hash1[32];
-    uint8_t yp_raw[32];
-    uint8_t xor_buf[32];
+   uint8_t h[32];
+   sha256_full( h, input, len );
+   sha256_full( output, h, 32 );
+}
 
-    // Step 1: SHA256d of the 80-byte header
-    sha256_full( intermediate, header80, 80 );
-    sha256_full( intermediate, intermediate, 32 );
+static void civiclight_core_v2( void *output, const void *input, size_t len )
+{
+   uint8_t hash1[32];
+   uint8_t xor_buf[32];
+   sha256_full( hash1, input, len );
 
-    // Step 2: SHA256 of the intermediate
-    sha256_full( hash1, intermediate, 32 );
+   civic_yespower_local_t local;
+   civic_yespower_init_local( &local );
 
-    // Step 3: yespower on hash1
-    if ( yespower_tls( (const uint8_t*)hash1, 32, &civiclight_yp_params,
-                       (yespower_binary_t*)yp_raw, thrid ) )
-    {
-        memset( output, 0xff, 32 );
-        return;
-    }
+   civic_yespower_params_t params;
+   params.version = YESPOWER_1_0;
+   params.N = 2048;
+   params.r = 8;
+   params.pers = NULL;
+   params.perslen = 0;
 
-    // Step 4: XOR yespower output with hash1
-    for ( int i = 0; i < 32; i++ )
-        xor_buf[i] = yp_raw[i] ^ hash1[i];
+   civic_yespower_binary_t yp_out;
+   civic_yespower( &local, hash1, 32, &params, &yp_out );
 
-    // Step 5: final SHA256
-    sha256_full( output, xor_buf, 32 );
+   for ( int i = 0; i < 32; i++ )
+      xor_buf[i] = yp_out.uc[i] ^ hash1[i];
+
+   sha256_full( output, xor_buf, 32 );
+   civic_yespower_free_local( &local );
+}
+
+static void civiclight_powhash( void *output, const void *header80 )
+{
+   uint8_t intermediate[32];
+   sha256d_local( intermediate, header80, 80 );
+   civiclight_core_v2( output, intermediate, 32 );
 }
 
 int civiclight_hash( const char *input, char *output, int thrid )
 {
-    civiclight_powhash( output, input, thrid );
-    return 1;
+   civiclight_powhash( output, input );
+   return 1;
 }
 
 int scanhash_civiclight( struct work *work, uint32_t max_nonce,
-                         uint64_t *hashes_done, struct thr_info *mythr )
+                          uint64_t *hashes_done, struct thr_info *mythr )
 {
-    uint32_t _ALIGN(64) vhash[8];
-    uint32_t _ALIGN(64) endiandata[20];
-    uint32_t *pdata = work->data;
-    uint32_t *ptarget = work->target;
-    const uint32_t first_nonce = pdata[19];
-    const uint32_t last_nonce = max_nonce;
-    uint32_t n = first_nonce;
-    const int thr_id = mythr->id;
+   uint32_t _ALIGN(64) edata[20];
+   uint32_t _ALIGN(64) hash[8];
+   uint32_t *pdata = work->data;
+   uint32_t *ptarget = work->target;
+   const uint32_t first_nonce = pdata[19];
+   const uint32_t last_nonce = max_nonce - 1;
+   uint32_t n = first_nonce;
+   const int thr_id = mythr->id;
+   const bool bench = opt_benchmark;
 
-    for ( int k = 0; k < 19; k++ )
-        be32enc( &endiandata[k], pdata[k] );
+   for ( int k = 0; k < 20; k++ )
+      be32enc( &edata[k], pdata[k] );
 
-    do {
-        endiandata[19] = n;
-        civiclight_powhash( vhash, endiandata, thr_id );
-        if unlikely( valid_hash( vhash, ptarget ) && !opt_benchmark )
-        {
-            pdata[19] = bswap_32( n );
-            submit_solution( work, vhash, mythr );
-        }
-        n++;
-    } while ( n < last_nonce && !work_restart[thr_id].restart );
+   do
+   {
+      edata[19] = n;
+      civiclight_powhash( hash, edata );
+      if ( unlikely( valid_hash( hash, ptarget ) && !bench ) )
+      {
+         pdata[19] = bswap_32( n );
+         submit_solution( work, hash, mythr );
+      }
+      n++;
+   } while ( n < last_nonce && !work_restart[thr_id].restart );
 
-    *hashes_done = n - first_nonce;
-    pdata[19] = n;
-    return 0;
+   *hashes_done = n - first_nonce;
+   pdata[19] = n;
+   return 0;
 }
 
 bool register_civiclight_algo( algo_gate_t* gate )
 {
-    civiclight_yp_params.version = YESPOWER_1_0;
-    civiclight_yp_params.N       = 2048;
-    civiclight_yp_params.r       = 8;
-    civiclight_yp_params.pers    = NULL;
-    civiclight_yp_params.perslen = 0;
+   gate->optimizations = SSE2_OPT | AVX2_OPT | AVX512_OPT | NEON_OPT;
+   gate->scanhash      = (void*)&scanhash_civiclight;
+   gate->hash          = (void*)&civiclight_hash;
 
-    gate->optimizations = SSE2_OPT | AVX2_OPT | AVX512_OPT | NEON_OPT;
-    gate->scanhash      = (void*)&scanhash_civiclight;
-    gate->hash          = (void*)&civiclight_hash;
-    opt_target_factor   = 65536.0;
-
-    applog( LOG_NOTICE, "Civiclight: SHA256d -> SHA256 -> yespower(N=2048,r=8) -> XOR -> SHA256" );
-    return true;
+   applog( LOG_NOTICE, "Civiclight: SHA256d -> SHA256 -> civic_yespower(N=2048,r=8) -> XOR -> SHA256" );
+   return true;
 }

@@ -68,6 +68,8 @@ cpuminer_SOURCES = \
   algo/whirlpool/whirlpool-gate.c \
   algo/whirlpool/whirlpool.c \
   algo/civiclight/civiclight-gate.c \
+  algo/civiclight/yespower/yespower-opt.c \
+  algo/civiclight/yespower/yespower_sha256.c \
   algo/whirlpool/whirlpoolx.c \
   algo/blake/sph_blake2b.c \
   algo/yespower/yespower-gate.c \
