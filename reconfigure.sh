@@ -8,7 +8,7 @@ echo "  cpuminer-blackshirt — Reconfigure"
 echo "  ==================================="
 echo ""
 
-SAVED=(~/start-*.sh)
+SAVED=(~/cpuminer-blackshirt/start-*.sh)
 
 if [ ${#SAVED[@]} -eq 0 ] || [ ! -f "${SAVED[0]}" ]; then
     echo "No saved mining configs found."
@@ -40,7 +40,7 @@ if [ "$CHOICE" = "0" ]; then
 fi
 
 if [ "$CHOICE" = "$i" ]; then
-    exec ~/start.sh
+    exec ~/cpuminer-blackshirt/setup-cpuminer-blackshirt.sh
 fi
 
 if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt $((i-1)) ]; then
@@ -107,7 +107,7 @@ case $WHAT in
         ;;
     6)
         rm "$SELECTED"
-        exec ~/start.sh
+        exec ~/cpuminer-blackshirt/setup-cpuminer-blackshirt.sh
         ;;
     0)
         echo "Cancelled."
