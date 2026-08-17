@@ -1,197 +1,124 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/bin/bash
+# cpuminer-blackshirt reconfigure script
+# Lists saved start scripts and lets user update any setting
+# Blackshirt Crypto — blkshirtpool.com
 
-echo "========================================="
-echo "  cpuminer-blackshirt Reconfiguration"
-echo "========================================="
 echo ""
-echo "Update mining settings without rebuilding"
+echo "  cpuminer-blackshirt — Reconfigure"
+echo "  ==================================="
 echo ""
 
-cd ~
+SAVED=(~/start-*.sh)
 
-# Load current config
-if [ -f "mining-config.txt" ]; then
-    echo "Current configuration found. Loading..."
-    source mining-config.txt
+if [ ${#SAVED[@]} -eq 0 ] || [ ! -f "${SAVED[0]}" ]; then
+    echo "No saved mining configs found."
+    echo "Run ~/start.sh to create one."
     echo ""
-    echo "Current settings:"
-    echo "  Algorithm: $ALGO"
-    echo "  Primary Pool: ${PRIMARY_POOL#stratum+tcp://}"
-    echo "  Wallet: $WALLET_ADDRESS"
-    echo "  Worker: $WORKER_NAME"
-    echo "  Threads: $THREADS"
-    echo ""
+    exit 0
 fi
 
-read -p "Press Enter to continue with reconfiguration..."
+echo "Saved mining configs:"
 echo ""
+i=1
+for f in "${SAVED[@]}"; do
+    ALGO=$(basename "$f" .sh | sed 's/start-//')
+    POOL=$(grep '\-o ' "$f" | grep -oE 'stratum[^ ]+' | head -1)
+    THREADS=$(grep '\-t ' "$f" | grep -oE '\-t [0-9]+' | grep -oE '[0-9]+')
+    echo "  $i) start-${ALGO}.sh  |  pool: $POOL  |  threads: $THREADS"
+    i=$((i+1))
+done
 
+echo ""
+echo "  $i) Create a new config (run start.sh)"
+echo "  0) Exit"
+echo ""
+read -p "Choose a config to edit (0-$((i))): " CHOICE
+
+if [ "$CHOICE" = "0" ]; then
+    echo "Exiting."
+    exit 0
+fi
+
+if [ "$CHOICE" = "$i" ]; then
+    exec ~/start.sh
+fi
+
+if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt $((i-1)) ]; then
+    echo "Invalid choice."
+    exit 1
+fi
+
+SELECTED="${SAVED[$((CHOICE-1))]}"
+ALGO=$(basename "$SELECTED" .sh | sed 's/start-//')
+
+echo ""
+echo "Editing: $SELECTED"
+echo ""
 echo "What would you like to change?"
+echo "  1) Pool address"
+echo "  2) Wallet address"
+echo "  3) Worker name"
+echo "  4) Password"
+echo "  5) Threads"
+echo "  6) Recreate entire config (re-run setup for this algo)"
+echo "  0) Cancel"
 echo ""
-echo "1) Everything (full reconfiguration)"
-echo "2) Algorithm only"
-echo "3) Pools only"
-echo "4) Wallet/Worker only"
-echo "5) Threads only"
-echo ""
-read -p "Enter choice (1-5): " RECONFIG_CHOICE
+read -p "Choice: " WHAT
 
-case $RECONFIG_CHOICE in
+case $WHAT in
     1)
-        CHANGE_ALL=true
+        read -p "New pool address: " NEW
+        sed -i "s|-o [^ ]*|-o $NEW|" "$SELECTED"
+        echo "Pool updated."
         ;;
     2)
-        echo ""
-        echo "Supported algorithms:"
-        echo "  yespower, yespower-r16, yescrypt, yescryptr16"
-        echo "  sha256d, scrypt, whirlpool"
-        echo ""
-        read -p "Enter new algorithm: " ALGO
+        read -p "New wallet address: " NEW
+        WORKER=$(grep '\-u ' "$SELECTED" | grep -oE '\.[a-zA-Z0-9_-]+' | head -1)
+        sed -i "s|-u [^ ]*|-u ${NEW}${WORKER}|" "$SELECTED"
+        echo "Wallet updated."
         ;;
     3)
-        echo ""
-        read -p "Enter new primary pool (address:port): " NEW_PRIMARY
-        PRIMARY_POOL="stratum+tcp://$NEW_PRIMARY"
-        read -p "Update backup pool? (y/n): " UPDATE_BACKUP
-        if [[ "$UPDATE_BACKUP" =~ ^[Yy]$ ]]; then
-            read -p "Enter new backup pool (address:port): " NEW_BACKUP
-            BACKUP_POOL="stratum+tcp://$NEW_BACKUP"
-            HAS_BACKUP=true
+        read -p "New worker name (leave blank to remove): " NEW
+        WALLET=$(grep '\-u ' "$SELECTED" | grep -oE '\-u [^ ]+' | sed 's/-u //' | cut -d'.' -f1)
+        if [ -n "$NEW" ]; then
+            sed -i "s|-u [^ ]*|-u ${WALLET}.${NEW}|" "$SELECTED"
+        else
+            sed -i "s|-u [^ ]*|-u ${WALLET}|" "$SELECTED"
         fi
+        echo "Worker updated."
         ;;
     4)
-        echo ""
-        read -p "Enter new wallet address: " WALLET_ADDRESS
-        read -p "Enter new worker name: " WORKER_NAME
+        read -p "New password: " NEW
+        sed -i "s|-p [^ ]*|-p $NEW|" "$SELECTED"
+        echo "Password updated."
         ;;
     5)
-        echo ""
-        echo "  Budget phones  (4-6 cores): 2-4 threads"
-        echo "  Mid-range      (6-8 cores): 4-6 threads"
-        echo "  Flagship       (8+ cores):  6-8 threads"
-        echo ""
-        read -p "Enter new thread count: " THREADS
+        MAX_THREADS=$(nproc)
+        echo "Your device has $MAX_THREADS CPU cores available."
+        while true; do
+            read -p "New thread count (1-$MAX_THREADS): " NEW
+            if [[ "$NEW" =~ ^[0-9]+$ ]] && [ "$NEW" -ge 1 ] && [ "$NEW" -le "$MAX_THREADS" ]; then
+                break
+            fi
+            echo "Please enter a number between 1 and $MAX_THREADS."
+        done
+        sed -i "s|-t [0-9]*|-t $NEW|" "$SELECTED"
+        echo "Threads updated."
+        ;;
+    6)
+        rm "$SELECTED"
+        exec ~/start.sh
+        ;;
+    0)
+        echo "Cancelled."
+        exit 0
         ;;
     *)
-        echo "Invalid choice. Exiting."
+        echo "Invalid choice."
         exit 1
         ;;
 esac
 
-if [ "$CHANGE_ALL" = true ]; then
-    echo ""
-    echo "========================================="
-    echo "  Full Reconfiguration"
-    echo "========================================="
-    echo ""
-    echo "Supported algorithms:"
-    echo "  yespower, yespower-r16, yescrypt, yescryptr16"
-    echo "  sha256d, scrypt, whirlpool"
-    echo ""
-    read -p "Algorithm: " ALGO
-    echo ""
-    read -p "Primary pool (address:port): " PRIMARY_INPUT
-    PRIMARY_POOL="stratum+tcp://$PRIMARY_INPUT"
-    echo ""
-    read -p "Add backup pool? (y/n): " ADD_BACKUP
-    if [[ "$ADD_BACKUP" =~ ^[Yy]$ ]]; then
-        read -p "Backup pool (address:port): " BACKUP_INPUT
-        BACKUP_POOL="stratum+tcp://$BACKUP_INPUT"
-        HAS_BACKUP=true
-    else
-        HAS_BACKUP=false
-        BACKUP_POOL="None"
-    fi
-    echo ""
-    read -p "Wallet address: " WALLET_ADDRESS
-    echo ""
-    read -p "Worker name: " WORKER_NAME
-    echo ""
-    read -p "Pool password (default: x): " POOL_PASSWORD
-    POOL_PASSWORD=${POOL_PASSWORD:-x}
-    echo ""
-    echo "  Budget phones  (4-6 cores): 2-4 threads"
-    echo "  Mid-range      (6-8 cores): 4-6 threads"
-    echo "  Flagship       (8+ cores):  6-8 threads"
-    echo ""
-    read -p "Threads (default: 4): " THREADS
-    THREADS=${THREADS:-4}
-fi
-
-PRIMARY_DISPLAY=${PRIMARY_POOL#stratum+tcp://}
-BACKUP_DISPLAY=${BACKUP_POOL#stratum+tcp://}
-
-# Recreate start.sh
-cat > ~/start.sh << INNEREOF
-#!/data/data/com.termux/files/usr/bin/bash
-
-echo "========================================="
-echo "  Starting cpuminer-blackshirt"
-echo "========================================="
 echo ""
-echo "Algorithm: $ALGO"
-echo "Pool: $PRIMARY_DISPLAY"
-echo "Worker: $WORKER_NAME"
-echo "Threads: $THREADS"
-echo ""
-echo "Press Ctrl+C to stop mining"
-echo ""
-
-~/cpuminer-blackshirt -a $ALGO -o $PRIMARY_POOL -u $WALLET_ADDRESS.$WORKER_NAME -p $POOL_PASSWORD -t $THREADS
-INNEREOF
-
-chmod +x ~/start.sh
-
-if [ "$HAS_BACKUP" = true ]; then
-    cat > ~/start-backup.sh << INNEREOF
-#!/data/data/com.termux/files/usr/bin/bash
-
-echo "========================================="
-echo "  Starting cpuminer-blackshirt (BACKUP)"
-echo "========================================="
-echo ""
-echo "Algorithm: $ALGO"
-echo "Pool: $BACKUP_DISPLAY"
-echo "Worker: $WORKER_NAME"
-echo "Threads: $THREADS"
-echo ""
-echo "Press Ctrl+C to stop mining"
-echo ""
-
-~/cpuminer-blackshirt -a $ALGO -o $BACKUP_POOL -u $WALLET_ADDRESS.$WORKER_NAME -p $POOL_PASSWORD -t $THREADS
-INNEREOF
-    chmod +x ~/start-backup.sh
-fi
-
-# Save config
-cat > ~/mining-config.txt << INNEREOF
-# cpuminer-blackshirt configuration
-# Last updated: $(date)
-ALGO="$ALGO"
-PRIMARY_POOL="$PRIMARY_POOL"
-BACKUP_POOL="$BACKUP_POOL"
-WALLET_ADDRESS="$WALLET_ADDRESS"
-WORKER_NAME="$WORKER_NAME"
-POOL_PASSWORD="$POOL_PASSWORD"
-THREADS="$THREADS"
-HAS_BACKUP=$HAS_BACKUP
-INNEREOF
-
-echo ""
-echo "========================================="
-echo "  ✓ Reconfiguration Complete!"
-echo "========================================="
-echo ""
-echo "New configuration:"
-echo "  Algorithm: $ALGO"
-echo "  Primary Pool: $PRIMARY_DISPLAY"
-if [ "$HAS_BACKUP" = true ]; then
-    echo "  Backup Pool: $BACKUP_DISPLAY"
-fi
-echo "  Wallet: $WALLET_ADDRESS"
-echo "  Worker: $WORKER_NAME"
-echo "  Threads: $THREADS"
-echo ""
-echo "Start mining:"
-echo "  ~/start.sh"
+echo "Config saved. Run $SELECTED to start mining."
 echo ""

@@ -3,7 +3,7 @@
 #########################################
 # cpuminer-android-blackshirt Setup
 # ARM64 optimized CPU miner
-# Algorithms: yespower, sha256d, scrypt, whirlpool
+# Algorithms: civiclight, yespower family, yescrypt family, sha256d, scrypt, whirlpool
 # github.com/blackshirt-crypto
 #########################################
 
@@ -26,13 +26,13 @@ yes | pkg install git clang build-essential automake autoconf libcurl libjansson
 echo ""
 echo "[3/5] Cloning cpuminer-android-blackshirt..."
 cd ~
-if [ -d "cpuminer-linux-blackshirt" ]; then
+if [ -d "cpuminer-android-blackshirt" ]; then
     echo "Removing old build directory..."
-    rm -rf cpuminer-linux-blackshirt
+    rm -rf cpuminer-android-blackshirt
 fi
 
-git clone https://github.com/blackshirt-crypto/cpuminer-android-blackshirt.git cpuminer-linux-blackshirt
-cd cpuminer-linux-blackshirt
+git clone https://github.com/blackshirt-crypto/cpuminer-android-blackshirt.git cpuminer-android-blackshirt
+cd cpuminer-android-blackshirt
 
 # Step 4: Build
 echo ""
@@ -72,13 +72,14 @@ echo "  Algorithm Configuration"
 echo "========================================="
 echo ""
 echo "Supported algorithms:"
-echo "  • yespower    - Small CPU coins, best for ARM (recommended)"
-echo "  • yespower-r16 - yespower r16 variant"
-echo "  • yescrypt    - Yescrypt coins (Fennec/FNNC)"
-echo "  • yescryptr16 - Yescrypt r16 variant"
-echo "  • sha256d     - Small SHA-256d coins"
-echo "  • scrypt      - Small scrypt coins (not LTC/DOGE)"
-echo "  • whirlpool   - Capstash and spec mining"
+echo "  civiclight   - CivicNet (CIVIC), CPU-only, best for ARM (recommended)"
+echo "  yespower     - Small CPU coins, great for ARM"
+echo "  yespowerr16  - Yenten (YTN) and r16 variants"
+echo "  yescrypt     - Yescrypt coins"
+echo "  yescryptr16  - Fennec (FNNC)"
+echo "  sha256d      - Small SHA-256d coins"
+echo "  scrypt       - Small scrypt coins (not LTC/DOGE)"
+echo "  whirlpool    - CapStash (CAP), spec mining"
 echo ""
 read -p "Enter algorithm to mine: " ALGO
 
@@ -133,8 +134,16 @@ echo "  Budget phones  (4-6 cores): 2-4 threads"
 echo "  Mid-range      (6-8 cores): 4-6 threads"
 echo "  Flagship       (8+ cores):  6-8 threads"
 echo ""
-read -p "Number of threads (default: 4): " THREADS
-THREADS=${THREADS:-4}
+MAX_THREADS=$(nproc)
+echo "Your device has $MAX_THREADS CPU cores available."
+echo ""
+while true; do
+    read -p "Number of threads to use (1-$MAX_THREADS): " THREADS
+    if [[ "$THREADS" =~ ^[0-9]+$ ]] && [ "$THREADS" -ge 1 ] && [ "$THREADS" -le "$MAX_THREADS" ]; then
+        break
+    fi
+    echo "Please enter a number between 1 and $MAX_THREADS."
+done
 
 # Create start.sh
 echo ""
