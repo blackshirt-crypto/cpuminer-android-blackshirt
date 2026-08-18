@@ -74,9 +74,7 @@ try:
         elif 'TTF @' in line:
             hr = re.search(r'TTF @ ([0-9.]+) h/s', line)
             nh = re.search(r'Net TTF @ ([0-9.]+) ([kmg]?h/s)', line, re.IGNORECASE)
-            b  = re.search(r'Block (\d+)', line)
             if hr: hashrate = hr.group(1)
-            if b:  block = b.group(1)
             if nh: nethash = f"{nh.group(1)} {nh.group(2)}"
 
         # Net hash rate from "Net hash rate (est)" line
