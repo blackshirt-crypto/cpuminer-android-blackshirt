@@ -144,11 +144,9 @@ INSTALL_DIR=~/cpuminer-blackshirt
 MINER="\$INSTALL_DIR/cpuminer-blackshirt"
 FILTER="\$INSTALL_DIR/filter.py"
 
-# Build pool args
+# Note: cpuminer-opt does not support multiple pools natively
+# POOL2 is saved for reference but not passed to the miner
 POOL_ARGS="-o \$POOL"
-if [ -n "\$POOL2" ]; then
-    POOL_ARGS="\$POOL_ARGS -o \$POOL2"
-fi
 
 trap "echo ''; echo 'Miner stopped.'; exit 0" INT TERM
 
